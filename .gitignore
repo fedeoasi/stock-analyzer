@@ -1,0 +1,6 @@
+/.bsp/
+target/
+alphadvantage.cache/
+out.csv
+.~lock.out.csv#
+.idea/
