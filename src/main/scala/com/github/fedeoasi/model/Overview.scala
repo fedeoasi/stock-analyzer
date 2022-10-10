@@ -11,9 +11,12 @@ case class OverviewDto(
   Sector: String,
   MarketCapitalization: String,
   EBITDA: String,
+  EVToEBITDA: String,
+  EVToRevenue: String,
   PERatio: String,
   EPS: String,
   ProfitMargin: String,
+  RevenueTTM: String,
   AnalystTargetPrice: String,
   DividendYield: String
 )
@@ -24,9 +27,12 @@ case class Overview(
   sector: String,
   marketCapitalization: Money,
   ebitda: Money,
+  evToEbitda: Money,
+  evToRevenue: Money,
   pERatio: Option[BigDecimal],
   ePS: BigDecimal,
   profitMargin: BigDecimal,
+  revenueTTM: Money,
   analystTargetPrice: Money,
   dividendYield: BigDecimal
 ) {
@@ -37,11 +43,14 @@ case class Overview(
     sector,
     marketCapitalization.amount,
     ebitda.amount,
+    evToEbitda.amount,
+    evToRevenue.amount,
     pERatio.getOrElse("N/A"),
     ePS,
     profitMargin,
-    analystTargetPrice.amount,
-    dividendYield
+    revenueTTM.amount,
+    dividendYield,
+    analystTargetPrice.amount
   ).map(_.toString)
 }
 
@@ -52,26 +61,32 @@ object Overview {
     "Sector",
     "MarketCapitalization",
     "EBITDA",
+    "EVToEBITDA",
+    "EVToRevenue",
     "PERatio",
     "EPS",
     "ProfitMargin",
-    "AnalystTargetPrice",
-    "DividendYield"
+    "RevenueTTM",
+    "DividendYield",
+    "AnalystTargetPrice"
   )
 
   def apply(dto: OverviewDto): Overview = {
     if (dto.Currency != "USD") throw new RuntimeException(s"Unknown currency $dto.Currency")
     Overview(
-      dto.Symbol,
-      dto.Name,
-      dto.Sector,
-      USD(BigDecimal(dto.MarketCapitalization)),
-      USD(BigDecimal(dto.EBITDA.toDouble)),
-      safeBigDecimal(dto.PERatio),
-      BigDecimal(dto.EPS.toDouble),
-      BigDecimal(dto.ProfitMargin.toDouble),
-      USD(BigDecimal(dto.AnalystTargetPrice.toDouble)),
-      BigDecimal(dto.DividendYield.toDouble),
+      symbol = dto.Symbol,
+      name = dto.Name,
+      sector = dto.Sector,
+      marketCapitalization = USD(BigDecimal(dto.MarketCapitalization)),
+      ebitda = USD(BigDecimal(dto.EBITDA.toDouble)),
+      evToEbitda = USD(BigDecimal(dto.EVToEBITDA.toDouble)),
+      evToRevenue = USD(BigDecimal(dto.EVToRevenue.toDouble)),
+      pERatio = safeBigDecimal(dto.PERatio),
+      ePS = BigDecimal(dto.EPS.toDouble),
+      profitMargin = BigDecimal(dto.ProfitMargin.toDouble),
+      revenueTTM = USD(BigDecimal(dto.RevenueTTM.toDouble)),
+      analystTargetPrice = USD(BigDecimal(dto.AnalystTargetPrice.toDouble)),
+      dividendYield = BigDecimal(dto.DividendYield.toDouble),
     )
   }
 

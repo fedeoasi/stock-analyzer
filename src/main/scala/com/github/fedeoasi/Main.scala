@@ -25,16 +25,22 @@ object Main extends StrictLogging {
   def main(args: Array[String]): Unit = {
     val client = new AlphadvantageClient
 
-    val results = Tickers.flatMap { ticker =>
-      val result = client.overview(ticker)
-      result
-    }
-    results.foreach(println)
-
-    logger.info("hello")
-
     val writer = CSVWriter.open("out.csv")
-    writer.writeRow(Overview.Header)
-    writer.writeAll(results.map(_.toCsv))
+    val header = Overview.Header ++ Seq("MostRecentPrice")
+    println(header)
+    writer.writeRow(header)
+
+    try {
+      Tickers.foreach { ticker =>
+        val Some(overview) = client.overview(ticker)
+        val entries = client.timeSeriesDaily(ticker)
+        val mostRecentPrice = entries.mostRecentEntry.close
+        val row = overview.toCsv ++ Seq(mostRecentPrice.amount)
+        println(row)
+        writer.writeRow(row)
+      }
+    } finally {
+      writer.close()
+    }
   }
 }
