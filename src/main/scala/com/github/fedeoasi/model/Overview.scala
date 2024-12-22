@@ -16,7 +16,10 @@ case class OverviewDto(
   PERatio: String,
   EPS: String,
   ProfitMargin: String,
+  Beta: String,
   RevenueTTM: String,
+  QuarterlyEarningsGrowthYOY: String,
+  QuarterlyRevenueGrowthYOY: String,
   AnalystTargetPrice: String,
   DividendYield: String
 )
@@ -26,15 +29,18 @@ case class Overview(
   name: String,
   sector: String,
   marketCapitalization: Money,
-  ebitda: Money,
-  evToEbitda: Money,
-  evToRevenue: Money,
+  ebitda: Option[Money],
+  evToEbitda: Option[Money],
+  evToRevenue: Option[BigDecimal],
   pERatio: Option[BigDecimal],
   ePS: BigDecimal,
   profitMargin: BigDecimal,
+  beta: BigDecimal,
   revenueTTM: Money,
+  quarterlyEarningsGrowthYoy: Option[BigDecimal],
+  quarterlyRevenueGrowthYoy: Option[BigDecimal],
   analystTargetPrice: Money,
-  dividendYield: BigDecimal
+  dividendYield: Option[BigDecimal]
 ) {
 
   def toCsv: Seq[String] = Seq(
@@ -42,14 +48,17 @@ case class Overview(
     name,
     sector,
     marketCapitalization.amount,
-    ebitda.amount,
-    evToEbitda.amount,
-    evToRevenue.amount,
+    ebitda.map(_.amount).getOrElse("N/A"),
+    evToEbitda.map(_.amount).getOrElse("N/A"),
+    evToRevenue.getOrElse("N/A"),
     pERatio.getOrElse("N/A"),
     ePS,
     profitMargin,
+    beta,
     revenueTTM.amount,
-    dividendYield,
+    quarterlyRevenueGrowthYoy.getOrElse("N/A"),
+    quarterlyEarningsGrowthYoy.getOrElse("N/A"),
+    dividendYield.getOrElse("N/A"),
     analystTargetPrice.amount
   ).map(_.toString)
 }
@@ -66,7 +75,10 @@ object Overview {
     "PERatio",
     "EPS",
     "ProfitMargin",
+    "Beta",
     "RevenueTTM",
+    "QuarterlyEarningsGrowthYOY",
+    "QuarterlyRevenueGrowthYOY",
     "DividendYield",
     "AnalystTargetPrice"
   )
@@ -78,15 +90,18 @@ object Overview {
       name = dto.Name,
       sector = dto.Sector,
       marketCapitalization = USD(BigDecimal(dto.MarketCapitalization)),
-      ebitda = USD(BigDecimal(dto.EBITDA.toDouble)),
-      evToEbitda = USD(BigDecimal(dto.EVToEBITDA.toDouble)),
-      evToRevenue = USD(BigDecimal(dto.EVToRevenue.toDouble)),
+      ebitda = safeBigDecimal(dto.EBITDA).map(USD.apply),
+      evToEbitda = safeBigDecimal(dto.EVToEBITDA).map(USD.apply),
+      evToRevenue = safeBigDecimal(dto.EVToRevenue),
       pERatio = safeBigDecimal(dto.PERatio),
       ePS = BigDecimal(dto.EPS.toDouble),
       profitMargin = BigDecimal(dto.ProfitMargin.toDouble),
+      beta = BigDecimal(dto.Beta),
       revenueTTM = USD(BigDecimal(dto.RevenueTTM.toDouble)),
+      quarterlyRevenueGrowthYoy = safeBigDecimal(dto.QuarterlyRevenueGrowthYOY),
+      quarterlyEarningsGrowthYoy = safeBigDecimal(dto.QuarterlyEarningsGrowthYOY),
       analystTargetPrice = USD(BigDecimal(dto.AnalystTargetPrice.toDouble)),
-      dividendYield = BigDecimal(dto.DividendYield.toDouble),
+      dividendYield = safeBigDecimal(dto.DividendYield),
     )
   }
 

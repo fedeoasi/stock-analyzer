@@ -1,6 +1,7 @@
 package com.github.fedeoasi
 
-import com.github.fedeoasi.model.{DailyEntries, DailyEntry, Overview, OverviewDto}
+import com.github.fedeoasi.model.{DailyEntries, DailyEntry, EarningsScheduleEntry, Overview, OverviewDto}
+import com.github.tototoshi.csv.CSVReader
 import com.typesafe.scalalogging.StrictLogging
 import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization
@@ -9,12 +10,15 @@ import squants.market.USD
 import sttp.client3.logging.slf4j.Slf4jLoggingBackend
 import sttp.client3._
 
-import java.io.FileWriter
+import java.io.{FileWriter, StringReader}
 import java.nio.file.{Files, Paths}
 import java.time.LocalDate
+import scala.util.{Failure, Success, Try}
 
 class AlphadvantageClient extends StrictLogging {
 
+  // example:
+  //   https://www.alphavantage.co/query?function=EARNINGS&apikey=*****&symbol=TTD
   private val ApiKey = sys.env("ALPHADVANTAGE_API_KEY")
 
   private implicit val serialization: Serialization.type = org.json4s.native.Serialization
@@ -22,7 +26,7 @@ class AlphadvantageClient extends StrictLogging {
 
   private val backend = Slf4jLoggingBackend(HttpClientSyncBackend())
 
-  private val MaxRequestsPerMinute = 5
+  private val MaxRequestsPerMinute = 3
 
   private def httpResponse(function: String, params: Map[String, String]) = {
     val request = basicRequest.get(uri"https://www.alphavantage.co/query?function=$function&apikey=$ApiKey&$params")
@@ -39,17 +43,32 @@ class AlphadvantageClient extends StrictLogging {
           logger.error(value)
           None
         case Right(value) =>
-          writeCache("overview", ticker, value)
-          Some(value)
+          if (value.contains("Our standard API rate limit is 25 requests per day")) {
+            None
+          } else {
+            writeCache("overview", ticker, value)
+            Some(value)
+          }
       }
     }.map { json =>
-      Overview(Serialization.read[OverviewDto](json))
+      Try {
+        Overview(Serialization.read[OverviewDto](json))
+      } match {
+        case Failure(exception) =>
+          logger.error(s"Error while parsing json: $json", exception)
+          throw exception
+        case Success(value) => value
+      }
     }
   }
 
   def timeSeriesDaily(ticker: String): DailyEntries = {
     val entries = getFromCache("timeSeriesDaily", ticker).orElse {
       val response = httpResponse("TIME_SERIES_DAILY", Map("symbol" -> ticker))
+
+      println(response)
+      println(response.code)
+      println(response.statusText)
 
       response.body match {
         case Left(value) =>
@@ -78,6 +97,27 @@ class AlphadvantageClient extends StrictLogging {
     DailyEntries(entries)
   }
 
+  def earningsCalendar: Seq[EarningsScheduleEntry] = {
+    getFromCache("earningsCalendar", "") match {
+      case Some(value) =>
+        val reader = CSVReader.open(new StringReader(value))
+        reader.allWithHeaders().map { obj =>
+          EarningsScheduleEntry(
+            symbol = obj("symbol"),
+            name = obj("name"),
+            reportDate = LocalDate.parse(obj("reportDate")),
+            fiscalDateEnding = LocalDate.parse(obj("fiscalDateEnding")),
+            estimate = Overview.safeBigDecimal(obj("estimate")),
+            currency = obj("currency")
+          )
+        }
+      case None =>
+        // https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&apikey=6E9VHGE2SK5O2I85
+        logger.warn(s"Please download the earnings calendar csv and place it in the cache at $CachePath/earningsCalendar-")
+        Seq.empty
+    }
+  }
+
   val CachePath = Paths.get("alphadvantage.cache")
 
   def writeCache(operation: String, key: String, value: String): Unit = {
@@ -91,8 +131,10 @@ class AlphadvantageClient extends StrictLogging {
 
   def getFromCache(operation: String, key: String): Option[String] = {
     CachePath.toFile.mkdir()
-    val filePath = CachePath.resolve(s"$operation-$key")
+    val cacheKey = s"$operation-$key"
+    val filePath = CachePath.resolve(cacheKey)
     if (filePath.toFile.exists()) {
+      println(s"Reading from cache $cacheKey")
       Some(new String(Files.readAllBytes(filePath)))
     } else {
       None
