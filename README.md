@@ -2,7 +2,7 @@
 
 This repository contains a command line tool to generate a table given stock tickers from a file.
 
-The tool uses the [https://www.alphavantage.co/](Alpha Vantage) API to download information about
+The tool uses the [Alpha Vantage](https://www.alphavantage.co/) API to download information about
 stocks given their ticker symbol.
 
 ## How to Use
